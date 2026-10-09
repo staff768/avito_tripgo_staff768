@@ -58,6 +58,6 @@ func main() {
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("graceful shutdown failed: %v", err)
+		log.Fatalf("shutdown timeout %s exceeded, forcing exit: %v", cfg.ShutdownTimeout, err)
 	}
 }

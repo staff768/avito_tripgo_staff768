@@ -18,6 +18,8 @@ const maxRequestBody = 1 << 20
 
 var tripDataRequiredFields = []string{"user_id", "driver_id", "start_point", "end_point", "price"}
 
+var coordinatesRequiredFields = []string{"latitude", "longitude"}
+
 func (a *App) CreateTrip(w http.ResponseWriter, r *http.Request, _ api.CreateTripParams) {
 	data, detail := decodeTripData(w, r)
 	if detail != "" {
@@ -87,13 +89,33 @@ func decodeTripData(w http.ResponseWriter, r *http.Request) (api.TripData, strin
 		return api.TripData{}, "Request body is not a valid trip document"
 	}
 
-	for _, field := range tripDataRequiredFields {
-		if _, ok := present[field]; !ok {
-			return api.TripData{}, field + " is required"
+	if detail := checkRequired(present, tripDataRequiredFields, ""); detail != "" {
+		return api.TripData{}, detail
+	}
+
+	for _, point := range []string{"start_point", "end_point"} {
+		pointPresent := map[string]json.RawMessage{}
+		if err := json.Unmarshal(present[point], &pointPresent); err != nil {
+			return api.TripData{}, "Request body is not a valid trip document"
+		}
+
+		if detail := checkRequired(pointPresent, coordinatesRequiredFields, point+"."); detail != "" {
+			return api.TripData{}, detail
 		}
 	}
 
 	return data, ""
+}
+
+func checkRequired(present map[string]json.RawMessage, required []string, prefix string) string {
+	for _, field := range required {
+		value, ok := present[field]
+		if !ok || string(value) == "null" {
+			return prefix + field + " is required"
+		}
+	}
+
+	return ""
 }
 
 func validateTripData(data api.TripData) string {
