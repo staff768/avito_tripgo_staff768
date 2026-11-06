@@ -6,3 +6,6 @@
 bin/
 
 .DS_Store
+coverage.out
+reports/mutation/*.log
+reports/mutation/latest*.json
