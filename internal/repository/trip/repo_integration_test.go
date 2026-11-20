@@ -4,10 +4,10 @@ package trip_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -15,7 +15,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
+	"github.com/pressly/goose/v3"
 	"go.opentelemetry.io/otel/metric/noop"
 	tracenoop "go.opentelemetry.io/otel/trace/noop"
 
@@ -27,11 +29,12 @@ import (
 )
 
 type fixture struct {
-	ctx     context.Context
-	pool    *pgxpool.Pool
-	tx      *transaction.TxManager
-	trips   *repository.TripRepository
-	history *repository.TripStatusHistoryRepository
+	ctx        context.Context
+	pool       *pgxpool.Pool
+	tx         *transaction.TxManager
+	trips      *repository.TripRepository
+	history    *repository.TripStatusHistoryRepository
+	migrations *goose.Provider
 }
 
 func setup(t *testing.T) fixture {
@@ -81,22 +84,24 @@ func setup(t *testing.T) fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	files, err := filepath.Glob("../../../migrations/*.sql")
-	if err != nil || len(files) != 2 {
-		t.Fatalf("find migrations: %v", err)
+	db := sql.OpenDB(stdlib.GetConnector(*cfg.ConnConfig))
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	migrations, err := goose.NewProvider(goose.DialectPostgres, db, os.DirFS("../../../migrations"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, file := range files {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		up := strings.Split(strings.TrimPrefix(string(data), "-- +goose Up"), "-- +goose Down")[0]
-		if _, err := pool.Exec(ctx, up); err != nil {
-			t.Fatal(err)
-		}
+	if _, err := migrations.Up(ctx); err != nil {
+		t.Fatal(err)
 	}
 	tx := transaction.New(pool, 3*time.Second)
-	return fixture{ctx: ctx, pool: pool, tx: tx, trips: repository.NewTripRepository(tx, 3*time.Second), history: repository.NewTripStatusHistoryRepository(tx, 3*time.Second)}
+	return fixture{
+		ctx: ctx, pool: pool, tx: tx, trips: repository.NewTripRepository(tx, 3*time.Second),
+		history: repository.NewTripStatusHistoryRepository(tx, 3*time.Second), migrations: migrations,
+	}
 }
 
 func newTrip(t *testing.T, driver uuid.UUID) model.Trip {
@@ -330,22 +335,12 @@ func TestCanceledCallbackRollback(t *testing.T) {
 
 func TestMigrationsDown(t *testing.T) {
 	f := setup(t)
-	files, err := filepath.Glob("../../../migrations/*.sql")
-	if err != nil {
+	if _, err := f.migrations.DownTo(f.ctx, 0); err != nil {
 		t.Fatal(err)
 	}
-	for i := len(files) - 1; i >= 0; i-- {
-		data, err := os.ReadFile(files[i])
-		if err != nil {
-			t.Fatal(err)
-		}
-		down := strings.Split(string(data), "-- +goose Down")[1]
-		if _, err := f.pool.Exec(f.ctx, down); err != nil {
-			t.Fatal(err)
-		}
-	}
 	var count int
-	if err := f.pool.QueryRow(f.ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema = current_schema()").Scan(&count); err != nil {
+	if err := f.pool.QueryRow(f.ctx, `SELECT count(*) FROM information_schema.tables
+		WHERE table_schema = current_schema() AND table_name <> 'goose_db_version'`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 0 {

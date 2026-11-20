@@ -28,6 +28,7 @@ var tripColumns = []string{
 	statusColumn,
 	"started_at",
 	"finished_at",
+	"last_position_at",
 	"created_at",
 	"updated_at",
 }

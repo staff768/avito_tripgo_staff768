@@ -47,7 +47,7 @@ func (t *Tracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.T
 	for i, field := range fields {
 		if (field == "FROM" || field == "INTO" || field == "UPDATE") && i+1 < len(fields) {
 			table := strings.ToLower(fields[i+1])
-			if table == "trips" || table == "trip_status_history" {
+			if table == "trips" || table == "trip_status_history" || table == "trip_positions" {
 				info.collection = table
 			}
 			break

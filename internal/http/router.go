@@ -13,18 +13,20 @@ import (
 	"github.com/staff768/avito_tripgo_staff768/internal/http/trip/create"
 	"github.com/staff768/avito_tripgo_staff768/internal/http/trip/finish"
 	"github.com/staff768/avito_tripgo_staff768/internal/http/trip/get"
+	"github.com/staff768/avito_tripgo_staff768/internal/http/trip/positions"
 )
 
 type API struct {
 	api.Unimplemented
-	create *create.Handler
-	get    *get.Handler
-	finish *finish.Handler
-	health *health.Handler
+	create    *create.Handler
+	get       *get.Handler
+	finish    *finish.Handler
+	health    *health.Handler
+	positions *positions.Handler
 }
 
-func New(create *create.Handler, get *get.Handler, finish *finish.Handler, health *health.Handler, logger *slog.Logger) http.Handler {
-	server := &API{create: create, get: get, finish: finish, health: health}
+func New(create *create.Handler, get *get.Handler, finish *finish.Handler, health *health.Handler, positions *positions.Handler, logger *slog.Logger) http.Handler {
+	server := &API{create: create, get: get, finish: finish, health: health, positions: positions}
 	return api.HandlerWithOptions(server, api.ChiServerOptions{BaseRouter: chi.NewRouter(), ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, logger, &domain.ValidationError{Field: "tripId", Reason: "has an invalid format"})
 	}})
@@ -39,5 +41,14 @@ func (a *API) GetTrip(w http.ResponseWriter, r *http.Request, id api.TripId) { a
 func (a *API) FinishTrip(w http.ResponseWriter, r *http.Request, id api.TripId) {
 	a.finish.Handle(w, r, id)
 }
+
+func (a *API) CreateTripPosition(w http.ResponseWriter, r *http.Request, id api.TripId) {
+	a.positions.Save(w, r, id)
+}
+
+func (a *API) ListTripPositions(w http.ResponseWriter, r *http.Request, id api.TripId) {
+	a.positions.List(w, r, id)
+}
+
 func (a *API) Health(w http.ResponseWriter, r *http.Request) { a.health.Health(w, r) }
 func (a *API) Ready(w http.ResponseWriter, r *http.Request)  { a.health.Ready(w, r) }

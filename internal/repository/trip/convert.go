@@ -20,6 +20,7 @@ func scanTrip(row pgx.Row) (model.Trip, error) {
 		&trip.Status,
 		&trip.StartedAt,
 		&trip.FinishedAt,
+		&trip.LastPositionAt,
 		&trip.CreatedAt,
 		&trip.UpdatedAt,
 	)

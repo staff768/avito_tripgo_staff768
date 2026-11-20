@@ -27,6 +27,7 @@ type Telemetry struct {
 	Propagator propagation.TextMapPropagator
 	created    metric.Int64Counter
 	completed  metric.Int64Counter
+	positions  metric.Int64Counter
 }
 
 func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*Telemetry, error) {
@@ -62,6 +63,9 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*Telemet
 	if err == nil {
 		t.completed, err = meter.Meter("tripgo").Int64Counter("tripgo.trips.completed", metric.WithUnit("{trip}"))
 	}
+	if err == nil {
+		t.positions, err = meter.Meter("tripgo").Int64Counter("tripgo.positions.saved", metric.WithUnit("{position}"))
+	}
 	if err != nil {
 		return nil, errors.Join(err, t.Shutdown(ctx))
 	}
@@ -84,8 +88,9 @@ func Sampler(name string, ratio float64) sdktrace.Sampler {
 		return sdktrace.ParentBased(sdktrace.AlwaysSample())
 	}
 }
-func (t *Telemetry) Created(ctx context.Context)   { t.created.Add(ctx, 1) }
-func (t *Telemetry) Completed(ctx context.Context) { t.completed.Add(ctx, 1) }
+func (t *Telemetry) Created(ctx context.Context)       { t.created.Add(ctx, 1) }
+func (t *Telemetry) Completed(ctx context.Context)     { t.completed.Add(ctx, 1) }
+func (t *Telemetry) PositionSaved(ctx context.Context) { t.positions.Add(ctx, 1) }
 func (t *Telemetry) Shutdown(ctx context.Context) error {
 	return errors.Join(t.Meter.Shutdown(ctx), t.Tracer.Shutdown(ctx))
 }

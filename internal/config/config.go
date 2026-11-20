@@ -37,6 +37,14 @@ type Config struct {
 	DatabaseMaxConnLifetime time.Duration `env:"DATABASE_MAX_CONN_LIFETIME" envDefault:"30m"`
 	DatabaseConnectTimeout  time.Duration `env:"DATABASE_CONNECT_TIMEOUT" envDefault:"5s"`
 	DatabaseQueryTimeout    time.Duration `env:"DATABASE_QUERY_TIMEOUT" envDefault:"3s"`
+
+	PositionCheckInterval time.Duration `env:"POSITION_CHECK_INTERVAL" envDefault:"30s"`
+	PositionStaleAfter    time.Duration `env:"POSITION_STALE_AFTER" envDefault:"60s"`
+	PositionWorkers       int           `env:"POSITION_WORKERS" envDefault:"4"`
+	PositionQueueSize     int           `env:"POSITION_QUEUE_SIZE" envDefault:"100"`
+	PositionScanBatchSize int           `env:"POSITION_SCAN_BATCH_SIZE" envDefault:"100"`
+	PushHTTPURL           string        `env:"PUSH_HTTP_URL,required"`
+	PushRequestTimeout    time.Duration `env:"PUSH_REQUEST_TIMEOUT" envDefault:"1s"`
 }
 
 func Load() (*Config, error) {
@@ -62,6 +70,8 @@ func (c *Config) Validate() error {
 		"SHUTDOWN_TIMEOUT": c.ShutdownTimeout, "DATABASE_MAX_CONN_LIFETIME": c.DatabaseMaxConnLifetime,
 		"DATABASE_CONNECT_TIMEOUT": c.DatabaseConnectTimeout, "DATABASE_QUERY_TIMEOUT": c.DatabaseQueryTimeout,
 		"OTEL_METRIC_EXPORT_INTERVAL_DURATION": c.OTelMetricInterval,
+		"POSITION_CHECK_INTERVAL":              c.PositionCheckInterval, "POSITION_STALE_AFTER": c.PositionStaleAfter,
+		"PUSH_REQUEST_TIMEOUT": c.PushRequestTimeout,
 	} {
 		if value <= 0 {
 			return fmt.Errorf("%s must be positive", name)
@@ -72,6 +82,17 @@ func (c *Config) Validate() error {
 	}
 	if c.DatabaseMaxConns <= 0 || c.DatabaseMinConns < 0 || c.DatabaseMinConns > c.DatabaseMaxConns {
 		return errors.New("invalid database pool limits")
+	}
+	if c.PositionWorkers <= 0 || c.PositionQueueSize <= 0 {
+		return errors.New("POSITION_WORKERS and POSITION_QUEUE_SIZE must be positive")
+	}
+	if c.PositionScanBatchSize <= 0 {
+		return errors.New("POSITION_SCAN_BATCH_SIZE must be positive")
+	}
+	pushURL, err := url.Parse(c.PushHTTPURL)
+	if err != nil || pushURL.Hostname() == "" || (pushURL.Scheme != "http" && pushURL.Scheme != "https") ||
+		pushURL.User != nil || pushURL.RawQuery != "" || pushURL.Fragment != "" {
+		return errors.New("PUSH_HTTP_URL must be an HTTP(S) base URL")
 	}
 	var level slog.Level
 	if err := level.UnmarshalText([]byte(c.LogLevel)); err != nil {

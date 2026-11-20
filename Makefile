@@ -21,7 +21,7 @@ run:
 	go run ./cmd/trip-service
 
 test:
-	go test -race -count=2 -coverprofile=coverage.out ./...
+	go test -race -count=2 -tags=integration -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out
 	go tool cover -func=coverage.out | awk '/internal\/(domain|usecase)\// { print }'
 
