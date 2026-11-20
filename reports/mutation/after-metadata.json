@@ -1,0 +1,21 @@
+{
+  "sources_sha256": {
+    "internal/domain/trip/trip.go": "40b037c3552a18db3d12d3bdc33bbc60c6d608cb08970ed11a85e5e5b4ded390",
+    "internal/domain/trip/trip_test.go": "2a05b7fc3964b451e84703ebeb399523d56a689364295cbc25ab48c90747aa1b",
+    "internal/usecase/trip/create/contract.go": "7512263fdcfcdae0e6f3851918865e815d964ca240ba0068e5ceb324966e5856",
+    "internal/usecase/trip/create/mocks_test.go": "0593bbb55bc557d2d298bf20d143ee63222258ef5a41cba0420d9609b71cde9c",
+    "internal/usecase/trip/create/usecase.go": "c8a20633c1ab0d9aa0d6b34d0f60b8acbb6dd5f3ccec5c2a8464b812d9da1a14",
+    "internal/usecase/trip/create/usecase_test.go": "d88e8134552ef2abe6f86a373da8665c243c018bb7372b9117067bd9676a0859",
+    "internal/usecase/trip/finish/contract.go": "f4f111399eba49dada9abdb6ff5a224ab82a8f221a67307f390275d320b37034",
+    "internal/usecase/trip/finish/mocks_test.go": "7a0c038ab2f7a8aab8d3bb29a33f114191dabbc8c9ceb79509ebce83dd00d790",
+    "internal/usecase/trip/finish/usecase.go": "0b408b6b2b0932b24cc3f721ae1e77ee2f97e8534ee305f9aaaf151d4550123b",
+    "internal/usecase/trip/finish/usecase_test.go": "9b54497f525843da2fcca2c5a892a692555f306ce0d713c6d04d930362b63002",
+    "internal/usecase/trip/get/contract.go": "ff728bac09126f571acc85200c5f274bbc162b8fa1029f753389ed6694dec78c",
+    "internal/usecase/trip/get/mocks_test.go": "7d26d3f7ab3c4bb02d6e64e45465dce35fe99778639cf676c38cce9cce1e0c50",
+    "internal/usecase/trip/get/usecase.go": "cfd290134f0c4f84d982af10e5661629d99cb9ce3a893493aa9185469a4a8cf7",
+    "internal/usecase/trip/get/usecase_test.go": "e8913560fa7e67223b1b644f8b9b0efe75c7ced4994a0f5a1ffed978d465a5aa"
+  },
+  "go_flags": "-race -buildvcs=false",
+  "tool_module": "github.com/avito-tech/go-mutesting",
+  "tool_version": "v0.0.0-20261002081621-9ce5f731e321"
+}

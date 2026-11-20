@@ -3,61 +3,51 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/staff768/avito_tripgo_staff768/internal/app"
 	"github.com/staff768/avito_tripgo_staff768/internal/config"
-	"github.com/staff768/avito_tripgo_staff768/internal/postgres"
-	"github.com/staff768/avito_tripgo_staff768/internal/repository"
-	"github.com/staff768/avito_tripgo_staff768/internal/server"
-	"github.com/staff768/avito_tripgo_staff768/internal/service"
+	"github.com/staff768/avito_tripgo_staff768/internal/container"
+	"github.com/staff768/avito_tripgo_staff768/internal/infra/telemetry"
 )
 
 func main() {
+	if err := run(); err != nil {
+		telemetry.NewLogger(os.Stdout, slog.LevelError, "trip-service").Error("service failed", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		return fmt.Errorf("load config: %w", err)
 	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-
-	connectCtx, cancel := context.WithTimeout(ctx, cfg.DatabaseConnectTimeout)
-	defer cancel()
-
-	pool, err := postgres.NewPool(connectCtx, cfg)
+	app, err := container.New(ctx, cfg)
 	if err != nil {
-		log.Fatalf("failed to connect to db: %v", err)
+		return fmt.Errorf("initialize application: %w", err)
 	}
-	defer pool.Close()
-
-	if err := pool.Ping(connectCtx); err != nil {
-		log.Fatalf("failed to ping db: %v", err)
-	}
-
-	txManager := postgres.NewTxManager(pool, cfg.DatabaseQueryTimeout)
-	trips := repository.NewTripRepository(txManager, cfg.DatabaseQueryTimeout)
-	history := repository.NewTripStatusHistoryRepository(txManager, cfg.DatabaseQueryTimeout)
-	tripService := service.NewTripService(txManager, trips, history)
-
-	a := app.New(pool, cfg.DatabaseQueryTimeout, tripService)
-	srv := server.New(cfg, a.Routes())
-
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("http server error: %v", err)
+	serverErr := make(chan error, 1)
+	go func() { serverErr <- app.Server.ListenAndServe() }()
+	app.Logger.InfoContext(ctx, "service started", "address", cfg.HTTPAddr)
+	select {
+	case <-ctx.Done():
+	case err = <-serverErr:
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
 		}
-	}()
-
-	<-ctx.Done()
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
-	defer shutdownCancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("shutdown timeout %s exceeded, forcing exit: %v", cfg.ShutdownTimeout, err)
 	}
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	defer cancel()
+	if closeErr := app.Close(shutdownCtx); closeErr != nil {
+		return errors.Join(err, fmt.Errorf("shutdown within %s: %w", cfg.ShutdownTimeout, closeErr))
+	}
+	app.Logger.InfoContext(shutdownCtx, "service stopped")
+	return err
 }
